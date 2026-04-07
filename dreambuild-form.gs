@@ -14,6 +14,8 @@
  */
 
 var NOTIFY_EMAIL = 'rnd001.apsara@gmail.com';
+var BRAND_VERSION = 'v1.0';
+var BRAND_LOGO_URL = '';
 
 /**
  * Web app endpoint for the Next.js onboarding form.
@@ -494,12 +496,17 @@ function sendEmailNotification(e) {
   var subject = '📋 New Onboarding Submission — ' + clientName +
                 ' (' + Utilities.formatDate(submittedAt, Session.getScriptTimeZone(), 'MMM dd, yyyy hh:mm a') + ')';
 
+  var pdfAttachment = createSubmissionPdf_({
+    title: 'Dreambuild Onboarding Submission',
+    subtitle: 'Google Form response export',
+    clientName: clientName,
+    submittedAt: submittedAt,
+    rows: rows
+  });
+
   var body =
     '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;">' +
-      '<div style="background:#1a1a2e;padding:24px;border-radius:8px 8px 0 0;">' +
-        '<h2 style="color:#ffffff;margin:0;font-size:20px;">Dreambuild Design Studio</h2>' +
-        '<p style="color:#aaaacc;margin:4px 0 0;">New Client Onboarding Form Submission</p>' +
-      '</div>' +
+      createEmailHeaderHtml_('New Client Onboarding Form Submission') +
 
       '<div style="background:#ffffff;padding:24px;border:1px solid #ddd;border-top:none;">' +
         '<p style="margin:0 0 16px;">A new client onboarding form was submitted on ' +
@@ -530,7 +537,8 @@ function sendEmailNotification(e) {
   MailApp.sendEmail({
     to:       NOTIFY_EMAIL,
     subject:  subject,
-    htmlBody: body
+    htmlBody: body,
+    attachments: [pdfAttachment]
   });
 }
 
@@ -574,12 +582,17 @@ function sendWebFormNotification_(payload) {
   var subject = '📋 Web Onboarding Submission — ' + clientName +
                 ' (' + Utilities.formatDate(submittedAt, Session.getScriptTimeZone(), 'MMM dd, yyyy hh:mm a') + ')';
 
+  var pdfAttachment = createSubmissionPdf_({
+    title: 'Dreambuild Website Submission',
+    subtitle: 'Website onboarding response export',
+    clientName: clientName,
+    submittedAt: submittedAt,
+    rows: rows
+  });
+
   var body =
     '<div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;">' +
-      '<div style="background:#4d2f1d;padding:24px;border-radius:10px 10px 0 0;">' +
-        '<h2 style="color:#ffffff;margin:0;font-size:20px;">Dreambuild Design Studio</h2>' +
-        '<p style="color:#f0d9be;margin:6px 0 0;">New website onboarding submission received</p>' +
-      '</div>' +
+      createEmailHeaderHtml_('New website onboarding submission received') +
       '<div style="background:#ffffff;padding:24px;border:1px solid #ddd;border-top:none;">' +
         '<p style="margin:0 0 16px;color:#4d2f1d;">Submitted on <strong>' +
           Utilities.formatDate(submittedAt, Session.getScriptTimeZone(), 'MMMM dd, yyyy \'at\' hh:mm a z') +
@@ -599,7 +612,8 @@ function sendWebFormNotification_(payload) {
   MailApp.sendEmail({
     to: NOTIFY_EMAIL,
     subject: subject,
-    htmlBody: body
+    htmlBody: body,
+    attachments: [pdfAttachment]
   });
 }
 
@@ -626,4 +640,53 @@ function jsonResponse_(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function createEmailHeaderHtml_(subtitle) {
+  var logoBlock = BRAND_LOGO_URL
+    ? '<img src="' + BRAND_LOGO_URL + '" alt="Dreambuild Logo" style="max-height:52px;display:block;margin:0 0 14px;" />'
+    : '<div style="display:inline-block;padding:10px 14px;border-radius:14px;background:#f7c948;color:#3e2a00;font-weight:bold;letter-spacing:0.16em;font-size:12px;">DREAMBUILD</div>';
+
+  return '<div style="background:#8f6300;padding:24px;border-radius:10px 10px 0 0;">' +
+           logoBlock +
+           '<h2 style="color:#ffffff;margin:0;font-size:20px;">Dreambuild Design Studio</h2>' +
+           '<p style="color:#fff1c2;margin:6px 0 0;">' + escapeHtml(subtitle) + ' • ' + BRAND_VERSION + '</p>' +
+         '</div>';
+}
+
+function createSubmissionPdf_(options) {
+  var safeClientName = String(options.clientName || 'Client').replace(/[^\w\-]+/g, '_');
+  var timestamp = Utilities.formatDate(options.submittedAt, Session.getScriptTimeZone(), 'yyyyMMdd_HHmm');
+
+  var logoBlock = BRAND_LOGO_URL
+    ? '<img src="' + BRAND_LOGO_URL + '" alt="Dreambuild Logo" style="max-height:62px;display:block;margin-bottom:16px;" />'
+    : '<div style="display:inline-block;padding:12px 16px;border-radius:16px;background:#f7c948;color:#3e2a00;font-weight:bold;letter-spacing:0.18em;font-size:12px;margin-bottom:16px;">DREAMBUILD</div>';
+
+  var pdfHtml =
+    '<html>' +
+      '<body style="font-family:Arial,sans-serif;color:#35270e;padding:28px;">' +
+        '<div style="border-bottom:3px solid #f7c948;padding-bottom:18px;margin-bottom:24px;">' +
+          logoBlock +
+          '<h1 style="margin:0 0 8px;font-size:24px;">' + escapeHtml(options.title) + '</h1>' +
+          '<p style="margin:0;color:#8f6300;font-size:14px;">' + escapeHtml(options.subtitle) + ' • ' + BRAND_VERSION + '</p>' +
+          '<p style="margin:10px 0 0;color:#6f6258;font-size:13px;">Client: ' + escapeHtml(options.clientName || 'Not provided') + '</p>' +
+          '<p style="margin:4px 0 0;color:#6f6258;font-size:13px;">Submitted: ' +
+            Utilities.formatDate(options.submittedAt, Session.getScriptTimeZone(), 'MMMM dd, yyyy hh:mm a z') +
+          '</p>' +
+        '</div>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+          '<thead>' +
+            '<tr>' +
+              '<th style="padding:10px 12px;background:#8f6300;color:#fff;text-align:left;border:1px solid #d9c89b;">Field</th>' +
+              '<th style="padding:10px 12px;background:#8f6300;color:#fff;text-align:left;border:1px solid #d9c89b;">Answer</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' + options.rows + '</tbody>' +
+        '</table>' +
+      '</body>' +
+    '</html>';
+
+  return Utilities.newBlob(pdfHtml, 'text/html', 'dreambuild_submission.html')
+    .getAs('application/pdf')
+    .setName('Dreambuild_' + safeClientName + '_' + timestamp + '.pdf');
 }

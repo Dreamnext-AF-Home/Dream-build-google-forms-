@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 
 const APPS_SCRIPT_WEB_APP_URL = process.env.APPS_SCRIPT_WEB_APP_URL;
 
+function shortenResponseText(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, 220);
+}
+
 export async function POST(request: Request) {
   try {
     if (!APPS_SCRIPT_WEB_APP_URL) {
@@ -38,12 +42,14 @@ export async function POST(request: Request) {
         { status: data.success ? 200 : 502 },
       );
     } catch {
+      const responsePreview = shortenResponseText(text);
+
       return NextResponse.json(
         {
           success: response.ok,
           message: response.ok
             ? "Submission sent, but the Apps Script response was not JSON."
-            : "Apps Script returned an invalid response.",
+            : `Apps Script returned ${response.status} ${response.statusText}. Response preview: ${responsePreview || "Empty response"}`,
         },
         { status: response.ok ? 200 : 502 },
       );
