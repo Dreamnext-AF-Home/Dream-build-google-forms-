@@ -55,23 +55,23 @@ a {
   align-items: center;
   margin-bottom: 18px;
   padding: 0;
-  border-radius: 24px;
+  border-radius: 28px;
   overflow: hidden;
   border: 1px solid rgba(201, 149, 21, 0.18);
-  background: #ffe14d;
+  background: transparent;
   box-shadow: 0 14px 30px rgba(181, 135, 20, 0.1);
 }
 
 .hero-brand-image {
   position: relative;
-  width: 280px;
-  height: 90px;
+  width: 320px;
+  height: 92px;
 }
 
 .hero-brand-image img {
-  object-fit: cover;
+  object-fit: fill;
   object-position: center;
-  filter: drop-shadow(0 10px 18px rgba(181, 135, 20, 0.16));
+  filter: none;
 }
 
 .hero,
@@ -795,8 +795,8 @@ a {
   }
 
   .hero-brand-image {
-    width: 220px;
-    height: 72px;
+    width: 240px;
+    height: 74px;
   }
 
   .success-modal-actions {
