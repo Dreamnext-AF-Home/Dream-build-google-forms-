@@ -1,13 +1,21 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useMemo, useState } from "react";
 
 type BaseField = {
   label: string;
   name: string;
   required?: boolean;
   placeholder?: string;
+  helperText?: string;
+};
+
+type UploadedImage = {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
 };
 
 type Field =
@@ -24,6 +32,11 @@ type Field =
   | (BaseField & {
       type: "checkbox-group";
       options: string[];
+    })
+  | (BaseField & {
+      type: "file-upload";
+      accept?: string;
+      maxFiles?: number;
     });
 
 type Group = {
@@ -43,7 +56,8 @@ type SubmitState = {
   message: string;
 };
 
-type FormValues = Record<string, string | string[]>;
+type FormValue = string | string[] | UploadedImage[];
+type FormValues = Record<string, FormValue>;
 
 const sectionChips = [
   "Client profile",
@@ -150,7 +164,6 @@ const sections: Section[] = [
             name: "accessibilityNeeds",
             options: ["Yes", "No"],
           },
-          { type: "text", label: "Pets (type and quantity)", name: "pets" },
           { type: "textarea", label: "Daily lifestyle / routine notes", name: "dailyLifestyle" },
           { type: "textarea", label: "Storage needs or special requirements", name: "storageNeeds" },
         ],
@@ -255,9 +268,48 @@ const sections: Section[] = [
           { type: "text", label: "Preferred Countertop Material", name: "countertopMaterial" },
           { type: "text", label: "Preferred Hardware Finish", name: "hardwareFinish" },
           { type: "text", label: "Materials / Finishes to Avoid", name: "materialsToAvoid" },
-          { type: "textarea", label: "Pinterest / Mood Board Links", name: "moodBoardLinks" },
-          { type: "textarea", label: "Pegs / Inspirations from social media or websites", name: "pegsInspirations" },
-          { type: "textarea", label: "Existing furniture or decor to retain", name: "existingFurniture" },
+          {
+            type: "textarea",
+            label: "Pinterest / Mood Board Links",
+            name: "moodBoardLinks",
+            helperText: "Optional. You can type links here and/or upload images below.",
+          },
+          {
+            type: "file-upload",
+            label: "Upload Pinterest / Mood Board Images",
+            name: "moodBoardImages",
+            accept: "image/*",
+            maxFiles: 6,
+            helperText: "Optional. Drag and drop images here or click to upload up to 6 files.",
+          },
+          {
+            type: "textarea",
+            label: "Pegs / Inspirations from social media or websites",
+            name: "pegsInspirations",
+            helperText: "Optional. You can type notes here and/or upload images below.",
+          },
+          {
+            type: "file-upload",
+            label: "Upload Pegs / Inspiration Images",
+            name: "pegsInspirationImages",
+            accept: "image/*",
+            maxFiles: 6,
+            helperText: "Optional. Drag and drop images here or click to upload up to 6 files.",
+          },
+          {
+            type: "textarea",
+            label: "Existing furniture or decor to retain",
+            name: "existingFurniture",
+            helperText: "Optional. You can describe the items here and/or upload images below.",
+          },
+          {
+            type: "file-upload",
+            label: "Upload Existing Furniture / Decor Images",
+            name: "existingFurnitureImages",
+            accept: "image/*",
+            maxFiles: 6,
+            helperText: "Optional. Drag and drop images here or click to upload up to 6 files.",
+          },
         ],
       },
     ],
@@ -382,13 +434,25 @@ const sections: Section[] = [
 const initialValues = sections.reduce<FormValues>((acc, section) => {
   section.groups.forEach((group) => {
     group.fields.forEach((field) => {
-      acc[field.name] = field.type === "checkbox-group" ? [] : "";
+      acc[field.name] = field.type === "checkbox-group" || field.type === "file-upload" ? [] : "";
     });
   });
   return acc;
 }, {});
 
-function getDisplayValue(value: string | string[]) {
+function isUploadedImageArray(value: FormValue): value is UploadedImage[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((item) => typeof item === "object" && item !== null && "dataUrl" in item)
+  );
+}
+
+function getDisplayValue(value: FormValue) {
+  if (isUploadedImageArray(value)) {
+    return value.length ? value.map((file) => file.name).join(", ") : "No images uploaded";
+  }
+
   if (Array.isArray(value)) {
     return value.length ? value.join(", ") : "Not provided";
   }
@@ -398,13 +462,22 @@ function getDisplayValue(value: string | string[]) {
 
 function buildSubmissionPayload(values: FormValues) {
   const sectionsPayload: Record<string, Record<string, string | string[]>> = {};
+  const uploadsPayload: Record<string, UploadedImage[]> = {};
 
   sections.forEach((section) => {
     section.groups.forEach((group) => {
       const groupPayload: Record<string, string | string[]> = {};
 
       group.fields.forEach((field) => {
-        groupPayload[field.label] = values[field.name];
+        const value = values[field.name];
+
+        if (isUploadedImageArray(value)) {
+          groupPayload[field.label] = value.map((file) => file.name);
+          uploadsPayload[field.name] = value;
+          return;
+        }
+
+        groupPayload[field.label] = value;
       });
 
       sectionsPayload[group.title] = groupPayload;
@@ -417,6 +490,7 @@ function buildSubmissionPayload(values: FormValues) {
     acknowledgmentName: String(values.acknowledgmentName || ""),
     emailAddress: String(values.emailAddress || ""),
     sections: sectionsPayload,
+    uploads: uploadsPayload,
     rawValues: values,
   };
 }
@@ -447,12 +521,44 @@ function getFirstMissingField(section: Section, values: FormValues) {
   return null;
 }
 
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) {
+    return `${Math.max(1, Math.round(size / 1024))} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<UploadedImage>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error(`Unable to read ${file.name}.`));
+        return;
+      }
+
+      resolve({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        dataUrl: reader.result,
+      });
+    };
+
+    reader.onerror = () => reject(new Error(`Unable to read ${file.name}.`));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Home() {
   const [currentStep, setCurrentStep] = useState(0);
   const [values, setValues] = useState<FormValues>(initialValues);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [dragFieldName, setDragFieldName] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<SubmitState>({
     type: "idle",
     message: "",
@@ -497,16 +603,94 @@ export default function Home() {
     }
   }
 
-  function updateValue(field: Field, nextValue: string | string[]) {
+  function updateValue(field: Field, nextValue: string | string[] | UploadedImage[]) {
     setValues((current) => ({
       ...current,
       [field.name]: nextValue,
     }));
   }
 
+  async function handleFilesSelected(field: Extract<Field, { type: "file-upload" }>, fileList: FileList | null) {
+    if (!fileList?.length) {
+      return;
+    }
+
+    const maxFiles = field.maxFiles ?? 6;
+    const selectedFiles = Array.from(fileList).filter((file) => file.type.startsWith("image/"));
+
+    if (!selectedFiles.length) {
+      setSubmitState({
+        type: "error",
+        message: "Please upload image files only.",
+      });
+      return;
+    }
+
+    if (selectedFiles.length > maxFiles) {
+      setSubmitState({
+        type: "error",
+        message: `You can upload up to ${maxFiles} images only.`,
+      });
+      return;
+    }
+
+    try {
+      const uploadedImages = await Promise.all(selectedFiles.map((file) => readFileAsDataUrl(file)));
+      setValues((current) => ({
+        ...current,
+        [field.name]: uploadedImages,
+      }));
+      setSubmitState({ type: "idle", message: "" });
+    } catch (error) {
+      setSubmitState({
+        type: "error",
+        message: error instanceof Error ? error.message : "Unable to upload images.",
+      });
+    }
+  }
+
+  function removeUploadedImage(fieldName: string, imageName: string) {
+    setValues((current) => {
+      const currentFiles = current[fieldName];
+      if (!isUploadedImageArray(currentFiles)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [fieldName]: currentFiles.filter((file) => file.name !== imageName),
+      };
+    });
+  }
+
+  function renderSummaryValue(field: Field) {
+    const value = values[field.name];
+
+    if (field.type === "file-upload") {
+      const uploadedFiles = isUploadedImageArray(value) ? value : [];
+
+      if (!uploadedFiles.length) {
+        return <strong>No images uploaded</strong>;
+      }
+
+      return (
+        <div className="summary-upload-list">
+          {uploadedFiles.map((file) => (
+            <div className="summary-upload-item" key={file.name}>
+              <strong>{file.name}</strong>
+              <span>{formatFileSize(file.size)}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return <strong>{getDisplayValue(value)}</strong>;
+  }
+
   function renderField(field: Field) {
     const fieldClassName =
-      field.type === "textarea" || field.type === "radio" || field.type === "checkbox-group"
+      field.type === "textarea" || field.type === "radio" || field.type === "checkbox-group" || field.type === "file-upload"
         ? "form-field field-span-full"
         : "form-field";
 
@@ -517,6 +701,7 @@ export default function Home() {
             {field.label}
             {field.required ? <strong className="required-mark"> *</strong> : null}
           </span>
+          {field.helperText ? <p className="field-help">{field.helperText}</p> : null}
           <textarea
             name={field.name}
             required={field.required}
@@ -526,6 +711,84 @@ export default function Home() {
             onChange={(event) => updateValue(field, event.target.value)}
           />
         </label>
+      );
+    }
+
+    if (field.type === "file-upload") {
+      const uploadedFiles = isUploadedImageArray(values[field.name]) ? values[field.name] : [];
+      const dropzoneActive = dragFieldName === field.name;
+
+      return (
+        <div className={fieldClassName} key={field.name} data-field-name={field.name}>
+          <span>
+            {field.label}
+            {field.required ? <strong className="required-mark"> *</strong> : null}
+          </span>
+          {field.helperText ? <p className="field-help">{field.helperText}</p> : null}
+          <div
+            className={`upload-dropzone ${dropzoneActive ? "upload-dropzone-active" : ""}`}
+            onDragEnter={(event: DragEvent<HTMLDivElement>) => {
+              event.preventDefault();
+              setDragFieldName(field.name);
+            }}
+            onDragOver={(event: DragEvent<HTMLDivElement>) => {
+              event.preventDefault();
+              setDragFieldName(field.name);
+            }}
+            onDragLeave={(event: DragEvent<HTMLDivElement>) => {
+              event.preventDefault();
+              if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                return;
+              }
+              setDragFieldName((current) => (current === field.name ? null : current));
+            }}
+            onDrop={(event: DragEvent<HTMLDivElement>) => {
+              event.preventDefault();
+              setDragFieldName(null);
+              void handleFilesSelected(field, event.dataTransfer.files);
+            }}
+          >
+            <input
+              id={field.name}
+              className="sr-only-input"
+              type="file"
+              accept={field.accept ?? "image/*"}
+              multiple={(field.maxFiles ?? 1) > 1}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                void handleFilesSelected(field, event.target.files);
+                event.target.value = "";
+              }}
+            />
+            <label className="upload-dropzone-inner" htmlFor={field.name}>
+              <strong>Drag and drop image here</strong>
+              <span>or click to upload</span>
+            </label>
+          </div>
+
+          {uploadedFiles.length ? (
+            <div className="upload-preview-grid">
+              {uploadedFiles.map((file) => (
+                <div className="upload-preview-card" key={file.name}>
+                  <div className="upload-preview-image">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={file.dataUrl} alt={file.name} />
+                  </div>
+                  <div className="upload-preview-meta">
+                    <strong>{file.name}</strong>
+                    <span>{formatFileSize(file.size)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="upload-remove"
+                    onClick={() => removeUploadedImage(field.name, file.name)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
       );
     }
 
@@ -759,7 +1022,7 @@ export default function Home() {
                           {group.fields.map((field) => (
                             <div className="summary-row" key={field.name}>
                               <span>{field.label}</span>
-                              <strong>{getDisplayValue(values[field.name])}</strong>
+                              {renderSummaryValue(field)}
                             </div>
                           ))}
                         </div>

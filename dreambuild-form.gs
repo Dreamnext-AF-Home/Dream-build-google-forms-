@@ -545,6 +545,7 @@ function sendEmailNotification(e) {
 function sendWebFormNotification_(payload) {
   var submittedAt = new Date();
   var sections = payload.sections || {};
+  var uploads = payload.uploads || {};
   var rows = '';
   var clientName = payload.acknowledgmentName ||
                    payload.clientFullName ||
@@ -609,11 +610,14 @@ function sendWebFormNotification_(payload) {
       '</div>' +
     '</div>';
 
+  var imageAttachments = createImageAttachments_(uploads);
+  var attachments = [pdfAttachment].concat(imageAttachments);
+
   MailApp.sendEmail({
     to: NOTIFY_EMAIL,
     subject: subject,
     htmlBody: body,
-    attachments: [pdfAttachment]
+    attachments: attachments
   });
 }
 
@@ -640,6 +644,41 @@ function jsonResponse_(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function createImageAttachments_(uploads) {
+  var attachments = [];
+
+  for (var fieldName in uploads) {
+    if (!uploads.hasOwnProperty(fieldName)) continue;
+
+    var files = uploads[fieldName];
+    if (!Array.isArray(files)) continue;
+
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      if (!file || !file.dataUrl || !file.name) continue;
+
+      try {
+        attachments.push(blobFromDataUrl_(file.dataUrl, file.name));
+      } catch (error) {
+        Logger.log('Skipping upload attachment "' + file.name + '": ' + error);
+      }
+    }
+  }
+
+  return attachments;
+}
+
+function blobFromDataUrl_(dataUrl, fileName) {
+  var matches = String(dataUrl).match(/^data:(.+);base64,(.+)$/);
+  if (!matches) {
+    throw new Error('Invalid data URL payload.');
+  }
+
+  var mimeType = matches[1];
+  var bytes = Utilities.base64Decode(matches[2]);
+  return Utilities.newBlob(bytes, mimeType, fileName);
 }
 
 function createEmailHeaderHtml_(subtitle) {
