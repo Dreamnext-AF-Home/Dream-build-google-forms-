@@ -667,7 +667,7 @@ export default function Home() {
     const value = values[field.name];
 
     if (field.type === "file-upload") {
-      const uploadedFiles = isUploadedImageArray(value) ? value : [];
+      const uploadedFiles: UploadedImage[] = isUploadedImageArray(value) ? value : [];
 
       if (!uploadedFiles.length) {
         return <strong>No images uploaded</strong>;
@@ -715,7 +715,9 @@ export default function Home() {
     }
 
     if (field.type === "file-upload") {
-      const uploadedFiles = isUploadedImageArray(values[field.name]) ? values[field.name] : [];
+      const uploadedFiles: UploadedImage[] = isUploadedImageArray(values[field.name])
+        ? values[field.name]
+        : [];
       const dropzoneActive = dragFieldName === field.name;
 
       return (
