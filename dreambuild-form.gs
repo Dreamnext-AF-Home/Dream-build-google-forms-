@@ -461,13 +461,22 @@ function sendEmailNotification(e) {
   var response      = e.response;
   var submittedAt   = response.getTimestamp();
   var itemResponses = response.getItemResponses();
+  var uploadAttachments = [];
 
   // Build a summary table of all answers
   var rows = '';
   for (var i = 0; i < itemResponses.length; i++) {
     var item   = itemResponses[i];
-    var title  = item.getItem().getTitle();
+    var formItem = item.getItem();
+    var title  = formItem.getTitle();
     var answer = item.getResponse();
+    var itemType = formItem.getType();
+
+    if (itemType === FormApp.ItemType.FILE_UPLOAD) {
+      var uploadResult = getDriveFileUploadSummary_(answer, title);
+      answer = uploadResult.summary;
+      uploadAttachments = uploadAttachments.concat(uploadResult.attachments);
+    }
 
     // Arrays (checkboxes) → comma-separated string
     if (Array.isArray(answer)) {
@@ -538,7 +547,7 @@ function sendEmailNotification(e) {
     to:       NOTIFY_EMAIL,
     subject:  subject,
     htmlBody: body,
-    attachments: [pdfAttachment]
+    attachments: [pdfAttachment].concat(uploadAttachments)
   });
 }
 
@@ -668,6 +677,33 @@ function createImageAttachments_(uploads) {
   }
 
   return attachments;
+}
+
+function getDriveFileUploadSummary_(responseValue, fieldTitle) {
+  var attachments = [];
+  var summaries = [];
+
+  if (!Array.isArray(responseValue)) {
+    responseValue = responseValue ? [responseValue] : [];
+  }
+
+  for (var i = 0; i < responseValue.length; i++) {
+    var fileId = responseValue[i];
+    if (!fileId) continue;
+
+    try {
+      var driveFile = DriveApp.getFileById(String(fileId));
+      summaries.push(driveFile.getName());
+      attachments.push(driveFile.getBlob().setName(driveFile.getName()));
+    } catch (error) {
+      Logger.log('Skipping Google Form upload for "' + fieldTitle + '" (' + fileId + '): ' + error);
+    }
+  }
+
+  return {
+    summary: summaries.length ? summaries.join(', ') : 'No uploaded files found',
+    attachments: attachments
+  };
 }
 
 function blobFromDataUrl_(dataUrl, fileName) {
