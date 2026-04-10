@@ -448,6 +448,10 @@ function isUploadedImageArray(value: FormValue): value is UploadedImage[] {
   );
 }
 
+function isStringArray(value: FormValue): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
 function getDisplayValue(value: FormValue) {
   if (isUploadedImageArray(value)) {
     return value.length ? value.map((file) => file.name).join(", ") : "No images uploaded";
@@ -715,8 +719,9 @@ export default function Home() {
     }
 
     if (field.type === "file-upload") {
-      const uploadedFiles: UploadedImage[] = isUploadedImageArray(values[field.name])
-        ? values[field.name]
+      const fieldValue = values[field.name];
+      const uploadedFiles: UploadedImage[] = isUploadedImageArray(fieldValue)
+        ? fieldValue
         : [];
       const dropzoneActive = dragFieldName === field.name;
 
@@ -804,10 +809,11 @@ export default function Home() {
           <div className="choice-grid">
             {field.options.map((option) => {
               const currentValue = values[field.name];
+              const selectedValues = isStringArray(currentValue) ? currentValue : [];
               const checked =
                 field.type === "radio"
                   ? currentValue === option
-                  : Array.isArray(currentValue) && currentValue.includes(option);
+                  : selectedValues.includes(option);
 
               return (
                 <label className="choice-chip" key={option}>
@@ -822,8 +828,9 @@ export default function Home() {
                         return;
                       }
 
-                      const previous = Array.isArray(values[field.name]) ? [...values[field.name]] : [];
-                      const next = event.target.checked
+                      const fieldValue = values[field.name];
+                      const previous: string[] = isStringArray(fieldValue) ? [...fieldValue] : [];
+                      const next: string[] = event.target.checked
                         ? [...previous, option]
                         : previous.filter((item) => item !== option);
                       updateValue(field, next);
