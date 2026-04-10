@@ -719,13 +719,12 @@ function blobFromDataUrl_(dataUrl, fileName) {
 
 function createEmailHeaderHtml_(subtitle) {
   var logoBlock = BRAND_LOGO_URL
-    ? '<img src="' + BRAND_LOGO_URL + '" alt="Dreambuild Logo" style="max-height:52px;display:block;margin:0 0 14px;" />'
-    : '<div style="display:inline-block;padding:10px 14px;border-radius:14px;background:#f7c948;color:#3e2a00;font-weight:bold;letter-spacing:0.16em;font-size:12px;">DREAMBUILD</div>';
+    ? '<img src="' + BRAND_LOGO_URL + '" alt="Dreambuild Logo" style="max-height:56px;display:block;margin:0 0 16px;" />'
+    : '';
 
   return '<div style="background:#8f6300;padding:24px;border-radius:10px 10px 0 0;">' +
            logoBlock +
-           '<h2 style="color:#ffffff;margin:0;font-size:20px;">Dreambuild Design Studio</h2>' +
-           '<p style="color:#fff1c2;margin:6px 0 0;">' + escapeHtml(subtitle) + ' • ' + BRAND_VERSION + '</p>' +
+           '<h2 style="color:#ffffff;margin:0;font-size:20px;">' + escapeHtml(subtitle) + '</h2>' +
          '</div>';
 }
 
