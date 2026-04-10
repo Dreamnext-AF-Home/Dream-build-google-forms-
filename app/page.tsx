@@ -1128,6 +1128,16 @@ export default function Home() {
           </div>
         </div>
       ) : null}
+
+      {isSubmitting ? (
+        <div className="submit-loading-backdrop" role="presentation">
+          <div className="submit-loading-card" role="status" aria-live="polite">
+            <div className="submit-loading-spinner" />
+            <h2>Submitting your form</h2>
+            <p>Please wait while we upload the files and send everything to Dreambuild.</p>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

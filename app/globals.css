@@ -708,6 +708,57 @@ a {
   flex-wrap: wrap;
 }
 
+.submit-loading-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(112, 80, 12, 0.36);
+  backdrop-filter: blur(10px);
+}
+
+.submit-loading-card {
+  width: min(100%, 440px);
+  padding: 30px;
+  border-radius: 28px;
+  background: #fffdf8;
+  border: 1px solid rgba(89, 62, 44, 0.12);
+  box-shadow: 0 24px 70px rgba(45, 29, 18, 0.24);
+  text-align: center;
+}
+
+.submit-loading-card h2 {
+  margin: 18px 0 10px;
+  font-size: clamp(1.7rem, 4vw, 2.2rem);
+  color: var(--brand-dark);
+  letter-spacing: -0.04em;
+}
+
+.submit-loading-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.submit-loading-spinner {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto;
+  border-radius: 999px;
+  border: 5px solid rgba(201, 149, 21, 0.18);
+  border-top-color: var(--brand);
+  animation: form-spin 0.9s linear infinite;
+}
+
+@keyframes form-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .summary-grid {
   display: grid;
   gap: 18px;
